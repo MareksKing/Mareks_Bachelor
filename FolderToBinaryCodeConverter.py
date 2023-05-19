@@ -23,13 +23,13 @@ amplitude = []
 file_paths = []
 
 # Loop through the files in the directory and append their paths to the file_paths array
-def addFilesForConversion(path_to_dir):
+def add_files_for_conversion(path_to_dir):
     for filename in os.listdir(path_to_dir):
         full_path = os.path.join(path_to_dir, filename)
         if os.path.isfile(full_path) and full_path.endswith('.h5'):
             file_paths.append(full_path)
 
-def addDataFromFilesToLists():
+def add_data_from_files_to_list():
     for i, file_path in enumerate(file_paths):
         with h5py.File(file_path, 'r') as f:
             
@@ -49,11 +49,9 @@ def addDataFromFilesToLists():
             dates.extend(np.full(data.shape[0], mjd))
             amplitude.extend(data[:, 3])
 
-# fileName = folderName+str(dates[0])+"-"+str(dates[-1])+".bin"
 
-
-def convertToBinaryCode(pathToFile, velocity, dates, amplitude):
-    with open(pathToFile, 'wb') as f:
+def convert_to_binary_code(path_to_file, velocity, dates, amplitude):
+    with open(path_to_file, 'wb') as f:
         pickle.dump((velocity, dates, amplitude), f)
 
 
@@ -64,14 +62,14 @@ file = r'data.bin'
 
 
 if __name__ == '__main__':
-    addFilesForConversion(path_to_dir)
-    addDataFromFilesToLists()
+    add_files_for_conversion(path_to_dir)
+    add_data_from_files_to_list()
     fileCount = len(file_paths)
     first_date = dates[0]
     last_date = dates[-1]
     fileName = '{}_{}-{}_{}.bin'.format(folderName, first_date, last_date, fileCount)
-    pathToFile = os.path.join(pathForConversionFiles, fileName)
-    convertToBinaryCode(pathToFile, velocity, dates, amplitude)
-    # convertToListData(file)
+    path_to_file = os.path.join(pathForConversionFiles, fileName)
+    convert_to_binary_code(path_to_file, velocity, dates, amplitude)
+    
 
 

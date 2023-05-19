@@ -1,14 +1,15 @@
 import numpy as np
 import pandas as pd
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 import h5py
 import os
 import argparse
 import time
-
+import plotly.graph_objects as go
 import pickle
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--file", help="Path to the selected folder")
@@ -17,21 +18,24 @@ parser.add_argument("--inputValue", help="Input Value")
 parser.add_argument("--limitingOption", help="Limiting option")
 parser.add_argument("--minValueLimit", help="Min value for limit")
 parser.add_argument("--maxValueLimit", help="Max value for limit")
+parser.add_argument("--viewAngle", help="Viewing angle for the plot")
 args = parser.parse_args()
 
+
 # Retrieve the folder path from the command-line argument
-print(args.selectedOption)
-print(args.inputValue)
-print(args.limitingOption)
-# print(args.minValueLimit)
-# print(args.maxValueLimit)
+print("Resolution change option:",args.selectedOption)
+print("N points:",args.inputValue)
+print("Limiting Option:",args.limitingOption)
+print("Limiting range:", args.minValueLimit, "-", args.maxValueLimit)
+print("ViewAngle:", args.viewAngle)
 file = args.file
 selectedOption = args.selectedOption
 limitingOption = args.limitingOption
-minValue = float(args.minValueLimit)
-maxValue = float(args.maxValueLimit)
-nthPoint = int(args.inputValue)
+min_value = float(args.minValueLimit)
+max_value = float(args.maxValueLimit)
+nth_point = int(args.inputValue)
 folderName = os.path.basename(file)
+viewAngle = int(args.viewAngle) -1
 
 tempVelocity = []
 tempDates = []
@@ -40,63 +44,65 @@ tempAmplitude = []
 velocity = []
 dates = []
 amplitude = []
+listOfViewAngles =[[45, 135], [45, 90], [45, 45], [45, 180], [90, -90], [45, 0], [45,-135], [45,-90], [45,-45]]
+elevation = listOfViewAngles[viewAngle][0]
+azimuth = listOfViewAngles[viewAngle][1]
 
-def limitingVelocities(minValue, maxValue):
+
+def limiting_velocities(min_value, max_value):
     for i, velocity_value in enumerate(tempVelocity):
-        if minValue <= velocity_value <= maxValue:
+        if min_value <= velocity_value <= max_value:
             velocity.append(velocity_value)
             dates.append(tempDates[i])
             amplitude.append(tempAmplitude[i])
-    print(len(velocity))
+
     
 
-def limitingDates(minValue, maxValue):
+def limiting_dates(min_value, max_value):
     for i, date in enumerate(tempDates):
-        if minValue <= date <= maxValue:
+        if min_value <= date <= max_value:
             dates.append(date)
             velocity.append(tempVelocity[i])
             amplitude.append(tempAmplitude[i])
     
-    print(len(velocity))
 
-def convertToListData(file):
+
+def convert_to_list_data(file):
     global tempVelocity, tempDates, tempAmplitude
     with open(file, 'rb') as f:
         tempVelocity, tempDates, tempAmplitude = pickle.load(f)
 
-
 # Add data to velocity, dates and amplitude arrays from the binary code using every nth point
-def everyNthPoint(nthPoint):
+def every_nth_point(nth_point):
     
-    velocity.extend(tempVelocity[::nthPoint])
-    dates.extend(tempDates[::nthPoint])
-    amplitude.extend(tempAmplitude[::nthPoint])
-    print(len(velocity))
+    velocity.extend(tempVelocity[::nth_point])
+    dates.extend(tempDates[::nth_point])
+    amplitude.extend(tempAmplitude[::nth_point])
 
 
 # Add data to velocity, dates and amplitude arrays from the file_paths using the average of n points
-def averageOfNPoints(nthPoint):
+def average_of_n_points(nth_point):
     global tempVelocity, tempDates, tempAmplitude
-    num_complete_groups = len(tempVelocity) // nthPoint
-    tempVelocity = tempVelocity[:num_complete_groups * nthPoint]
-    tempDates = tempDates[:num_complete_groups * nthPoint]
-    tempAmplitude = tempAmplitude[:num_complete_groups * nthPoint]
+    num_complete_groups = len(tempVelocity) // nth_point
+    tempVelocity = tempVelocity[:num_complete_groups * nth_point]
+    tempDates = tempDates[:num_complete_groups * nth_point]
+    tempAmplitude = tempAmplitude[:num_complete_groups * nth_point]
 
-    reshaped_velocity = np.reshape(tempVelocity, (-1, nthPoint))
-    reshaped_amplitude = np.reshape(tempAmplitude, (-1, nthPoint))
-    reshaped_dates = np.reshape(tempDates, (-1, nthPoint))
+    reshaped_velocity = np.reshape(tempVelocity, (-1, nth_point))
+    reshaped_amplitude = np.reshape(tempAmplitude, (-1, nth_point))
+    reshaped_dates = np.reshape(tempDates, (-1, nth_point))
 
-    averageVelocity = np.mean(reshaped_velocity, 1)
-    averageAmplitude = np.mean(reshaped_amplitude, 1)
-    averageDates = np.mean(reshaped_dates, 1)
+    average_velocity = np.mean(reshaped_velocity, 1)
+    average_amplitude = np.mean(reshaped_amplitude, 1)
+    average_dates = np.mean(reshaped_dates, 1)
 
-    dates[:len(averageDates)] = averageDates
-    velocity[:len(averageVelocity)] = averageVelocity
-    amplitude[:len(averageAmplitude)] = averageAmplitude
-    print(len(velocity))    
+    dates[:len(average_dates)] = average_dates
+    velocity[:len(average_velocity)] = average_velocity
+    amplitude[:len(average_amplitude)] = average_amplitude
+  
 
 
-def interpolateDataInNPoints(nthPoint):
+def interpolate_data_to_n_points(nth_point):
 
     drop_indices = []
 
@@ -109,38 +115,33 @@ def interpolateDataInNPoints(nthPoint):
     drop_indices = [0] + drop_indices + [len(tempVelocity)]
 
     # Use the drop_indices list to split the original list into smaller arrays
-    velocitySplit = [tempVelocity[start:end] for start, end in zip(drop_indices, drop_indices[1:])]
-    datesSplit = [tempDates[start:end] for start, end in zip(drop_indices, drop_indices[1:])]
-    amplitudeSplit = [tempAmplitude[start:end] for start, end in zip(drop_indices, drop_indices[1:])]
+    velocity_split = [tempVelocity[start:end] for start, end in zip(drop_indices, drop_indices[1:])]
+    dates_split = [tempDates[start:end] for start, end in zip(drop_indices, drop_indices[1:])]
+    amplitude_split = [tempAmplitude[start:end] for start, end in zip(drop_indices, drop_indices[1:])]
     
 
 
-    for i in range(len(velocitySplit)):
-        print(len(velocitySplit[i]))
-        # print(datesSplit)
-        newVelocity = np.linspace(np.min(velocitySplit[i]), np.max(velocitySplit[i]), nthPoint)
-        newAmplitude = np.interp(newVelocity, velocitySplit[i], amplitudeSplit[i])
-        newDates = np.interp(newVelocity, velocitySplit[i], datesSplit[i])
+    for i in range(len(velocity_split)):
+        new_velocity = np.linspace(np.min(velocity_split[i]), np.max(velocity_split[i]), nth_point)
+        new_amplitude = np.interp(new_velocity, velocity_split[i], amplitude_split[i])
+        new_dates = np.interp(new_velocity, velocity_split[i], dates_split[i])
 
-        velocity.extend(newVelocity)
-        dates.extend(newDates)
-        amplitude.extend(newAmplitude)
+        velocity.extend(new_velocity)
+        dates.extend(new_dates)
+        amplitude.extend(new_amplitude)
 
-        
-        
-    print(len(velocity))
 
 # Create a 3D plot using the waterfall method
-def plotTheData(velocity, dates, amplitude):
+def plot_the_data(velocity, dates, amplitude):
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
  
     cmap = plt.get_cmap('jet')
 
     scat = ax.scatter(velocity, dates, amplitude, c=amplitude, cmap=cmap)
-    ax.view_init(elev=90, azim=-90)
+    ax.view_init(elev=elevation, azim=azimuth)
 
-    ax.set_xlabel('Ātrums (km ^-1/s)')
+    ax.set_xlabel('Ātrums (km/s^-1)')
     ax.set_ylabel('Modificētā Juliāna diena')
     ax.set_zlabel('Amplitūda (Jy)')
     ax.set_title(f"{folderName} Waterfall Plot")
@@ -148,36 +149,53 @@ def plotTheData(velocity, dates, amplitude):
     fig.colorbar(scat)
     
 
-def main():
+def visualize_3d_data(velocity, dates, amplitude):
+    fig = go.Figure(data=[go.Scatter3d(x=velocity , y=dates, z=amplitude, mode='markers',
+                     marker=dict(color=amplitude, colorscale='jet', cmin=np.min(amplitude),
+                                 cmax=np.max(amplitude), colorbar=dict(title='Amplitude intensity')))
+    ])
+    fig.update_layout(scene=dict(xaxis_title='Velocity', yaxis_title='Dates', zaxis_title='Amplitude'),
+                      title='Datacube monitoring')
 
+    fig.show()
+
+
+
+def main():
     start_time = time.time()
     if limitingOption == "Velocity":
-        convertToListData(file)
-        limitingVelocities(minValue, maxValue)
-        plotTheData(velocity, dates, amplitude)
+        convert_to_list_data(file)
+        limiting_velocities(min_value, max_value)
+        plot_the_data(velocity, dates, amplitude)
+        # visualize_3d_data(velocity, dates, amplitude)
     elif limitingOption == "MJD":
-        convertToListData(file)
-        limitingDates(minValue, maxValue)
-        plotTheData(velocity, dates, amplitude)
+        convert_to_list_data(file)
+        limiting_dates(min_value, max_value)
+        plot_the_data(velocity, dates, amplitude)
+        # visualize_3d_data(velocity, dates, amplitude)
     elif limitingOption == "None":
         if selectedOption == "Every nth point":
-            convertToListData(file)
-            everyNthPoint(nthPoint)
-            plotTheData(velocity, dates, amplitude)
+            convert_to_list_data(file)
+            every_nth_point(nth_point)
+            plot_the_data(velocity, dates, amplitude)
+            # visualize_3d_data(velocity, dates, amplitude)
         
         elif selectedOption == "Average of n-points":
-            convertToListData(file)
-            averageOfNPoints(nthPoint)
-            plotTheData(velocity, dates, amplitude)
+            convert_to_list_data(file)
+            average_of_n_points(nth_point)
+            plot_the_data(velocity, dates, amplitude)
+            # visualize_3d_data(velocity, dates, amplitude)
 
         elif selectedOption == "Interpolate":
-            convertToListData(file)
-            interpolateDataInNPoints(nthPoint)
-            plotTheData(velocity, dates, amplitude)
+            convert_to_list_data(file)
+            interpolate_data_to_n_points(nth_point)
+            plot_the_data(velocity, dates, amplitude)
+            # visualize_3d_data(velocity, dates, amplitude)
 
     end_time = time.time()
-
+            
     time_taken = end_time - start_time
+    print("Data points:",len(velocity))
     print("Time taken by function: ", time_taken, " seconds")
     plt.show()
 
