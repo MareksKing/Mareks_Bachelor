@@ -19,6 +19,10 @@ def select_folder():
         selected_folder = folder_path
         folder_name = folder_path.split("/")[-1]
         lbl_selected_folder.config(text=folder_name)
+        print("Folder selected")
+    else:
+        print("No folder selected")
+    # return folder_name
 
     
 
@@ -87,6 +91,9 @@ def plot_files_in_folder_with_limitations():
                     "--visualizationOption", plot_visualization_option, "--viewAngle", str(plot_viewing_angle)])
     
 
+def update_label(folder_path):
+    folder_name = folder_path.split("/")[-1]
+    lbl_selected_folder.config(text=folder_name)
 
 def create_binary_code_from_folder():
       
@@ -94,13 +101,16 @@ def create_binary_code_from_folder():
 
       subprocess.run(["python", plotter_file,"--folder",selected_folder])
 
-def select_bin_file():
+def select_bin_or_h5_file():
     global selected_file
-    file_path = filedialog.askopenfilename(filetypes=[('Binary files', '*.bin')])
+    file_path = filedialog.askopenfilename(filetypes=[('Files', ['.bin', '.h5'])])
     if file_path:
         selected_file = file_path
         file_name = file_path.split("/")[-1]
         lbl_selected_folder.config(text=file_name)
+        print("File selected")
+    else:
+        print("No file selected")
 
 def plot_binary_data():
     
@@ -150,6 +160,7 @@ def plot_binary_data():
     subprocess.run(["python", plotter_file,"--file",selected_file, "--selectedOption", option, "--inputValue", str(input_value), "--limitingOption", limiting_option, "--minValueLimit", str(min_limit),"--maxValueLimit", str(max_limit), "--viewAngle", str(plot_viewing_angle)])
 
 # Create the GUI root
+
 root = tk.Tk()
 root.title("Datu kuba Vizualizācija")
 root.geometry("800x400")
@@ -162,13 +173,13 @@ btn_select_folder= tk.Button(root, text="Izvēlēties mapi", command=select_fold
 btn_select_folder.place(x=100, y=50)
 
 btn_start_plotting = tk.Button(root, text="Sākt vizualizāciju", command=plot_files_in_folder_with_resolution_change)
-btn_start_plotting.place(x=335, y=300)
+btn_start_plotting.place(x=475, y=300)
 
-btn_select_file = tk.Button(root, text="Izvēlēties .bin failu", command=select_bin_file)
+btn_select_file = tk.Button(root, text="Izvēlēties .bin failu", command=select_bin_or_h5_file)
 btn_select_file.place(x=100, y=100)
 
-btn_select_file = tk.Button(root, text="Sākt bināro vizualizāciju", command=plot_binary_data)
-btn_select_file.place(x=450, y=300)
+# btn_select_file = tk.Button(root, text="Sākt bināro vizualizāciju", command=plot_binary_data)
+# btn_select_file.place(x=450, y=300)
 
 btn_start_conversion_to_binary = tk.Button(root, text="Pārvērst binārā kodā", command=create_binary_code_from_folder)
 btn_start_conversion_to_binary.place(x=600, y=300)
@@ -179,7 +190,6 @@ label.place(x=100, y=100)
 
 options = ["Nav", "Every nth point", "Average of n-points", "Interpolate", "Velocity list"]
 selectedOption = tk.StringVar(root, value=options[0])
-# selectedOption.set("Options")
 dropdown_menu = tk.OptionMenu(root, selectedOption, *options)
 dropdown_menu.place(x=100, y=200)
 

@@ -27,9 +27,16 @@ parser.add_argument("--visualizationOption", help="Which plot to generate")
 args = parser.parse_args()
 
 path_to_dir = args.folder
-viewAngle = int(args.viewAngle) -1
+if args.viewAngle:
+    viewAngle = int(args.viewAngle) -1
+else:
+    viewAngle = 4
+
+
 selectedOption = args.selectedOption
 limitingOption = args.limitingOption
+plotting_option = args.visualizationOption
+
 if limitingOption != None:
     min_value, max_value = float(args.minValueLimit), float(args.maxValueLimit)
 else:
@@ -38,9 +45,12 @@ else:
             viewAngle = int(args.viewAngle) -1
 
         elif selectedOption == "Velocity list":
-            if len(args.velocity_list) != 0 :
+            if args.velocity_list :
                 converted_velocities = [float(x) for x in str(args.velocity_list).split(',')]
                 print(converted_velocities)
+            else:
+                print("No velocities given")
+                sys.exit()
             viewAngle = int(args.viewAngle) -1
         else:
             nth_point = int(args.inputValue)
@@ -52,20 +62,6 @@ else:
 
 print("Resolution change option:",args.selectedOption)
 print("N points:",args.inputValue)
-# print("Limiting Option:",args.limitingOption)
-# print("Limiting range:", args.minValueLimit, "-", args.maxValueLimit)
-# print("ViewAngle:", args.viewAngle)
-# print("Velocities list:", args.velocities_list)
-# limitingOption = args.limitingOption
-# min_value = float(args.minValueLimit)
-# max_value = float(args.maxValueLimit)
-# nth_point = int(args.inputValue)
-folderName = os.path.basename(args.folder)
-visualization_option = args.visualizationOption
-# viewAngle = int(args.viewAngle) -1
-# if len(args.velocities_list) != 0 :
-#     converted_velocities = [float(x) for x in str(args.velocities_list).split(',')]
-#     print(converted_velocities)
 
 
 velocity = []
@@ -99,7 +95,7 @@ def limiting_dates(min_value, max_value):
 
 file_paths = []
 
-def read_data_from_files(file_paths):
+def read_data_from_files(file_paths, temp_velocity, temp_dates, temp_amplitude):
     for i, file_path in enumerate(file_paths):
         with h5py.File(file_path, 'r') as f:
             
@@ -120,7 +116,7 @@ def read_data_from_files(file_paths):
             temp_amplitude.extend(data[:, 3])
 
 # Loop through the files in the directory and append their paths to the file_paths array
-def add_files_for_plotting(path_to_dir):
+def add_files_for_plotting(path_to_dir, file_paths):
     for filename in os.listdir(path_to_dir):
         full_path = os.path.join(path_to_dir, filename)
         if os.path.isfile(full_path) and full_path.endswith('.h5'):
@@ -168,7 +164,7 @@ def average_of_n_points(nth_point):
     together. The function takes in data from multiple files and groups them into sets of nth_point data
     points, then calculates the average velocity and amplitude for each set
     """
-    temp_velocity, temp_dates, temp_amplitude = [],[],[]
+    temp_velocity, temp_amplitude = [],[]
     for i, file_path in enumerate(file_paths):
         with h5py.File(file_path, 'r') as f:
 
@@ -192,14 +188,14 @@ def average_of_n_points(nth_point):
             mjd = int(file_name.split('_')[1].split('.')[0])
             dates.extend(np.full(data.shape[0] // nth_point, mjd))
             temp_amplitude.extend(data[:, 3])
-            reshaped_velocity = np.reshape(temp_velocity, (-1, nth_point))
-            reshaped_amplitude = np.reshape(temp_amplitude, (-1, nth_point))
+    reshaped_velocity = np.reshape(temp_velocity, (-1, nth_point))
+    reshaped_amplitude = np.reshape(temp_amplitude, (-1, nth_point))
 
-            average_velocity = np.mean(reshaped_velocity, 1)
-            average_amplitude = np.mean(reshaped_amplitude, 1)
+    average_velocity = np.mean(reshaped_velocity, 1)
+    average_amplitude = np.mean(reshaped_amplitude, 1)
 
-            velocity[:len(average_velocity)] = average_velocity
-            amplitude[:len(average_amplitude)] = average_amplitude    
+    velocity[:len(average_velocity)] = average_velocity
+    amplitude[:len(average_amplitude)] = average_amplitude    
 
 
 def interpolate_data_to_n_points(nth_point):
@@ -250,15 +246,16 @@ def plot_the_data(velocity, dates, amplitude):
  
     cmap = plt.get_cmap('jet')
 
+    
     scat = ax.scatter(velocity, dates, amplitude, c=amplitude, cmap=cmap)
     ax.view_init(elev=elevation, azim=azimuth)
 
 
 
-    ax.set_xlabel('Ātrums (km/s^-1)')
+    ax.set_xlabel('Ātrums (km s$^{-1}$)')
     ax.set_ylabel('Modificētā Juliāna diena')
     ax.set_zlabel('Amplitūda (Jy)')
-    ax.set_title(f"{folderName} Waterfall Plot")
+    ax.set_title(f"{os.path.basename(args.folder)} Waterfall Plot")
 
     fig.colorbar(scat)
     
@@ -271,7 +268,7 @@ def visualize_3d_data(velocity, dates, amplitude):
                                                    cmax=np.max(amplitude), colorbar=dict(title='Amplitude intensity')))
     ])
     
-    fig.update_layout(scene=dict(xaxis_title='Ātrums (km/s^-1)', yaxis_title='Modificētā Juliāna diena', zaxis_title='Amplitūda (Jy)'),
+    fig.update_layout(scene=dict(xaxis_title=r'Ātrums (km s⁻¹)', yaxis_title='Modificētā Juliāna diena', zaxis_title='Amplitūda (Jy)'),
                       title='Datacube monitoring',)
 
     fig.show()
@@ -321,52 +318,45 @@ def plot_choice(plotting_option, velocity, dates, amplitude):
 
     print("Data points:",len(velocity))
 
-def main():
-    start_time = time.time()
-    if limitingOption == "Velocity":
-        add_files_for_plotting(path_to_dir)
-        read_data_from_files(file_paths)
-        limiting_velocities(min_value, max_value)
-        plot_choice(visualization_option, velocity, dates, amplitude)
-    elif limitingOption == "MJD":
-        add_files_for_plotting(path_to_dir)
-        read_data_from_files(file_paths)
-        limiting_dates(min_value, max_value)
-        plot_choice(visualization_option, velocity, dates, amplitude)
-    
-    # elif limitingOption == "None":
-    if selectedOption == "Every nth point":
-        add_files_for_plotting(path_to_dir)
-        every_nth_point(nth_point)
-        plot_choice(visualization_option, velocity, dates, amplitude)
-    elif selectedOption == "Average of n-points":
-        add_files_for_plotting(path_to_dir)
-        average_of_n_points(nth_point)
-        plot_choice(visualization_option, velocity, dates, amplitude)
+if limitingOption == "Velocity":
+    add_files_for_plotting(path_to_dir, file_paths)
+    read_data_from_files(file_paths, temp_velocity, temp_dates, temp_amplitude)
+    limiting_velocities(min_value, max_value)
+    plot_choice(plotting_option, velocity, dates, amplitude)
+elif limitingOption == "MJD":
+    add_files_for_plotting(path_to_dir, file_paths)
+    read_data_from_files(file_paths, temp_velocity, temp_dates, temp_amplitude)
+    limiting_dates(min_value, max_value)
+    plot_choice(plotting_option, velocity, dates, amplitude)
 
-    elif selectedOption == "Interpolate":
-        add_files_for_plotting(path_to_dir)
-        interpolate_data_to_n_points(nth_point)
-        plot_choice(visualization_option, velocity, dates, amplitude)
-    elif selectedOption == "Velocity list":
-        add_files_for_plotting(path_to_dir)
-        read_data_from_files(file_paths)
-        velocity_selection(converted_velocities, temp_velocity, temp_dates, temp_amplitude)
-    elif selectedOption == "Nav":
-        add_files_for_plotting(path_to_dir)
-        read_data_from_files(file_paths)
-        plot_choice(visualization_option, temp_velocity, temp_dates, temp_amplitude)
+# elif limitingOption == "None":
+if selectedOption == "Every nth point":
+    add_files_for_plotting(path_to_dir, file_paths)
+    every_nth_point(nth_point)
+    plot_choice(plotting_option, velocity, dates, amplitude)
+elif selectedOption == "Average of n-points":
+    add_files_for_plotting(path_to_dir, file_paths)
+    average_of_n_points(nth_point)
+    plot_choice(plotting_option, velocity, dates, amplitude)
+
+elif selectedOption == "Interpolate":
+    add_files_for_plotting(path_to_dir, file_paths)
+    interpolate_data_to_n_points(nth_point)
+    plot_choice(plotting_option, velocity, dates, amplitude)
+elif selectedOption == "Velocity list":
+    add_files_for_plotting(path_to_dir, file_paths)
+    read_data_from_files(file_paths, temp_velocity, temp_dates, temp_amplitude)
+    velocity_selection(converted_velocities, temp_velocity, temp_dates, temp_amplitude)
+elif selectedOption == "Nav":
+    add_files_for_plotting(path_to_dir, file_paths)
+    read_data_from_files(file_paths, temp_velocity, temp_dates, temp_amplitude)
+    plot_choice(plotting_option, temp_velocity, temp_dates, temp_amplitude)
 
 
-
-    end_time = time.time()
-
-    time_taken = end_time - start_time
-            
-    print("Data points:",len(velocity))
-    print("Time taken by function: ", time_taken, " seconds")
-    plt.show()
+        
+print("Data points:",len(velocity))
+# print("Time taken by function: ", time_taken, " seconds")
+plt.show()
     
 
-if __name__ == '__main__':
-    main()
+
